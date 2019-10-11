@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Isla</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link type="text/css" rel="stylesheet" href="main.css">
+	</head>
+	<body>
+
+		<div id="container"></div>
+
+		<script type="module">
+
+			import * as THREE from './build/three.module.js';
+
+			import { GUI } from './build/dat.gui.module.js';
+			import { OrbitControls } from './build/OrbitControls.js';
+			import { Water } from './build/Water2.js';
+			import { MTLLoader } from './build/MTLLoader.js';
+			import { OBJLoader } from './build/OBJLoader.js';
+
+			//variables globales
+			var scene, camera, renderer, agua, mesh, clock, textureLoader;
+			var pisoMalla, ambientLight, light, esferaFondo;
+			var keyboard;
+			var jugador;
+			var step = 0;
+
+			keyboard = {};
+			jugador = { height:1.8, speed:0.2, turnSpeed:Math.PI*0.02 };
+
+			//Creacion pantalla de carga
+			var loadingScreen = {
+				scene: new THREE.Scene(),
+				camera: new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 100),
+				box: new THREE.Mesh(
+					new THREE.BoxGeometry(0.5,0.5,0.5),
+					new THREE.MeshBasicMaterial({ color:0x4444ff })
+				)
+			};
+			var loadingManager = null;
+			var RESOURCES_LOADED = false;
+
+			//Precarga de modelos
+			var modelos = {
+				//Terreno
+				bloque: {
+					obj:"modelos/block.obj",
+					mtl:"modelos/block.mtl",
+					mesh:null
+
+				},
+				bloqueNieve: {
+					obj:"modelos/blockSnow.obj",
+					mtl:"modelos/blockSnow.mtl",
+					mesh:null
+
+				},
+				bloqueTierra: {
+					obj:"modelos/blockDirt.obj",
+					mtl:"modelos/blockDirt.mtl",
+					mesh:null
+
+				},
+				medioBloqueTierra: {
+					obj:"modelos/blockDirtHalf.obj",
+					mtl:"modelos/blockDirtHalf.mtl",
+					mesh:null
+
+				},
+			  medioBloque: {
+					obj:"modelos/blockHalf.obj",
+					mtl:"modelos/blockHalf.mtl",
+					mesh:null
+
+				},
+			  bloqueLargo: {
+					obj:"modelos/blockLarge.obj",
+					mtl:"modelos/blockLarge.mtl",
+					mesh:null
+				},
+				bloqueDes: {
+					obj:"modelos/blockSlope.obj",
+					mtl:"modelos/blockSlope.mtl",
+					mesh:null
+				},
+				bloqueDesNieve: {
+					obj:"modelos/blockSnowSlope.obj",
+					mtl:"modelos/blockSnowSlope.mtl",
+					mesh:null
+				},
+				bloqueDesMedio: {
+					obj:"modelos/blockSlopeHalf.obj",
+					mtl:"modelos/blockSlopeHalf.mtl",
+					mesh:null
+				},
+				bloqueDesMedioNieve: {
+					obj:"modelos/blockSnowSlopeHalf.obj",
+					mtl:"modelos/blockSnowSlopeHalf.mtl",
+					mesh:null
+				},
+				bloqueEsPeque: {
+					obj:"modelos/blockSnowCornerSmall.obj",
+					mtl:"modelos/blockSnowCornerSmall.mtl",
+					mesh:null
+				},
+				bloqueLevel: {
+					obj:"modelos/blockLevel.obj",
+					mtl:"modelos/blockLevel.mtl",
+					mesh:null
+				},
+			  arbol: {
+					obj:"modelos/tree.obj",
+					mtl:"modelos/tree.mtl",
+					mesh:null,
+					receiveShadow:false
+				},
+				arbolNieve: {
+					obj:"modelos/treeSnow.obj",
+					mtl:"modelos/treeSnow.mtl",
+					mesh:null,
+					receiveShadow:false
+				},
+				bloqueBordeEsq: {
+					obj:"modelos/blockCliffCorner.obj",
+					mtl:"modelos/blockCliffCorner.mtl",
+					mesh:null,
+				},
+				bloqueBorde: {
+					obj:"modelos/blockCliff.obj",
+					mtl:"modelos/blockCliff.mtl",
+					mesh:null,
+				},
+				bloqueHexa: {
+					obj:"modelos/blockHexagon.obj",
+					mtl:"modelos/blockHexagon.mtl",
+					mesh:null,
+				},
+				bloqueHexaNieve: {
+					obj:"modelos/blockSnowHexagon.obj",
+					mtl:"modelos/blockSnowHexagon.mtl",
+					mesh:null,
+				},
+				bloqueHexaBajo: {
+					obj:"modelos/blockHexagonLow.obj",
+					mtl:"modelos/blockHexagonLow.mtl",
+					mesh:null,
+				},
+				bloqueHexaBajoNieve: {
+					obj:"modelos/blockSnowHexagonLow.obj",
+					mtl:"modelos/blockSnowHexagonLow.mtl",
+					mesh:null,
+				},
+
+				//Objetos
+				saliente: {
+					obj:"modelos/hedge.obj",
+					mtl:"modelos/hedge.mtl",
+					mesh:null
+				},
+				salienteEsquina: {
+					obj:"modelos/hedgeCorner.obj",
+					mtl:"modelos/hedgeCorner.mtl",
+					mesh:null
+				},
+				rampaMadera: {
+					obj:"modelos/bridgeRamp.obj",
+					mtl:"modelos/bridgeRamp.mtl",
+					mesh:null
+				},
+				sanja: {
+					obj:"modelos/fence.obj",
+					mtl:"modelos/fence.mtl",
+					mesh:null
+				},
+				sanjaCurva: {
+					obj:"modelos/fenceCornerCurved.obj",
+					mtl:"modelos/fenceCornerCurved.mtl",
+					mesh:null
+				},
+				sanjaMedia: {
+					obj:"modelos/fenceLowCorner.obj",
+					mtl:"modelos/fenceLowCorner.mtl",
+					mesh:null
+				},
+				puerta: {
+					obj:"modelos/door.obj",
+					mtl:"modelos/door.mtl",
+					mesh:null
+				},
+				bandera: {
+					obj:"modelos/flag.obj",
+					mtl:"modelos/flag.mtl",
+					mesh:null
+				},
+				plataforma: {
+					obj:"modelos/blockMoving.obj",
+					mtl:"modelos/blockMoving.mtl",
+					mesh:null
+				},
+				hongos: {
+					obj:"modelos/mushrooms.obj",
+					mtl:"modelos/mushrooms.mtl",
+					mesh:null
+				},
+				rocas: {
+					obj:"modelos/rocks.obj",
+					mtl:"modelos/rocks.mtl",
+					mesh:null
+				},
+				caja: {
+					obj:"modelos/crate.obj",
+					mtl:"modelos/crate.mtl",
+					mesh:null
+				},
+				puente: {
+					obj:"modelos/bridge.obj",
+					mtl:"modelos/bridge.mtl",
+					mesh:null
+				},
+				medioPuente: {
+					obj:"modelos/bridgeHalf.obj",
+					mtl:"modelos/bridgeHalf.mtl",
+					mesh:null
+				},
+				flores: {
+					obj:"modelos/flowers.obj",
+					mtl:"modelos/flowers.mtl",
+					mesh:null
+				},
+				llave: {
+					obj:"modelos/key.obj",
+					mtl:"modelos/key.mtl",
+					mesh:null
+				},
+				sierra: {
+					obj:"modelos/saw.obj",
+					mtl:"modelos/saw.mtl",
+					mesh:null,
+					receiveShadow:false,
+					castShadow:true
+				},
+				letrero: {
+					obj:"modelos/arrow.obj",
+					mtl:"modelos/arrow.mtl",
+					mesh:null
+				},
+				letrero2: {
+					obj:"modelos/arrows.obj",
+					mtl:"modelos/arrows.mtl",
+					mesh:null
+				},
+				aviso: {
+					obj:"modelos/sign.obj",
+					mtl:"modelos/sign.mtl",
+					mesh:null
+				},
+				barril: {
+					obj:"modelos/barrel.obj",
+					mtl:"modelos/barrel.mtl",
+					mesh:null
+				},
+				trampaEs: {
+					obj:"modelos/spikesHidden.obj",
+					mtl:"modelos/spikesHidden.mtl",
+					mesh:null
+				},
+				trampa: {
+					obj:"modelos/spikesLarge.obj",
+					mtl:"modelos/spikesLarge.mtl",
+					mesh:null
+				}
+			};
+
+			//arreglo para las mallas de los modelos
+			var mallas = {};
+
+			init();
+			animate();
+
+			function init() {
+
+				// scene
+				scene = new THREE.Scene();
+
+				// camera
+				camera = new THREE.PerspectiveCamera( 100, window.innerWidth / window.innerHeight, 0.1, 1000 );
+				camera.position.set(8, jugador.height, -1);
+				camera.lookAt(new THREE.Vector3(0,jugador.height,0));
+
+				clock = new THREE.Clock();
+				textureLoader = new THREE.TextureLoader(loadingManager);
+
+				//pantalla de carga
+				loadingScreen.box.position.set(0,0,5);
+				loadingScreen.camera.lookAt(loadingScreen.box.position);
+				loadingScreen.scene.add(loadingScreen.box);
+				loadingScreen.scene.background = new THREE.Color(0x000000);
+
+				var loadingManager = new THREE.LoadingManager();
+				loadingManager.onProgress = function(item, loaded, total){
+					console.log(item, loaded, total);
+				};
+				loadingManager.onLoad = function(){
+					console.log("modelos cargados");
+					RESOURCES_LOADED = true;
+					onResourcesLoaded();
+				};
+
+				/*
+				//Fondo en esfera
+				esferaFondo = new THREE.Mesh(
+					new THREE.SphereGeometry(30,30,30),
+					new THREE.MeshBasicMaterial({
+						map: (new THREE.TextureLoader).load("texturas/fondos/fondo5.jpg"),
+						side: THREE.BackSide
+					})
+				);
+				scene.add(esferaFondo);
+
+				// skybox
+				var geometry = new THREE.CubeGeometry( 140, 140, 140 );
+				var cubeMaterials = [
+    				new THREE.MeshBasicMaterial({ map: textureLoader.load( "texturas/skybox/nightsky_ft.png" ), side: THREE.DoubleSide }), //frontal
+    				new THREE.MeshBasicMaterial({ map: textureLoader.load( 'texturas/skybox/nightsky_bk.png' ), side: THREE.DoubleSide }), //tracera
+    				new THREE.MeshBasicMaterial({ map: textureLoader.load( 'texturas/skybox/nightsky_up.png' ), side: THREE.DoubleSide }), //arriba
+    				new THREE.MeshBasicMaterial({ map: textureLoader.load( 'texturas/skybox/nightsky_dn.png' ), side: THREE.DoubleSide }), //abajo
+    				new THREE.MeshBasicMaterial({ map: textureLoader.load( 'texturas/skybox/nightsky_rt.png' ), side: THREE.DoubleSide }), //derecha
+    				new THREE.MeshBasicMaterial({ map: textureLoader.load( 'texturas/skybox/nightsky_lf.png' ), side: THREE.DoubleSide }) //izquierda
+					];
+
+				var cubeMaterial = new THREE.MeshFaceMaterial( cubeMaterials );
+				var cube = new THREE.Mesh( geometry, cubeMaterial );
+				scene.add( cube );
+				*/
+
+				//skybox en toda la escena
+				scene.background = new THREE.CubeTextureLoader(loadingManager)
+					.setPath( 'texturas/skybox/' )
+					.load( [ 'nightsky_ft.png', 'nightsky_bk.png', 'nightsky_up.png', 'nightsky_dn.png', 'nightsky_rt.png', 'nightsky_lf.png' ] );
+
+				//Piso
+				var pisoMallaGeometry = new THREE.PlaneBufferGeometry( 40, 40, 10, 10 );
+				var pisoMallaMaterial = new THREE.MeshPhongMaterial( { color: 0xcccccc } );
+				var pisoMalla = new THREE.Mesh( pisoMallaGeometry, pisoMallaMaterial );
+				pisoMalla.rotation.x = Math.PI * - 0.5;
+				scene.add( pisoMalla );
+
+				//texturas map, bumpMap, normalMap del piso
+				textureLoader.load( 'texturas/terreno/sand_diff.jpg', function (pisoMap) {
+					pisoMap.wrapS = THREE.RepeatWrapping;
+					pisoMap.wrapT = THREE.RepeatWrapping;
+					pisoMap.anisotropy = 16;
+					pisoMap.repeat.set( 4, 4 );
+					pisoMallaMaterial.map = pisoMap;
+					pisoMallaMaterial.needsUpdate = true;
+				} );
+				textureLoader.load("texturas/terreno/sand_bump.jpg", function(pisoBumpMap){
+					pisoBumpMap.wrapS = THREE.RepeatWrapping;
+					pisoBumpMap.wrapT = THREE.RepeatWrapping;
+					pisoBumpMap.anisotropy = 16;
+					pisoBumpMap.repeat.set( 4, 4 );
+					pisoMallaMaterial.bumpMap = pisoBumpMap;
+					pisoMallaMaterial.needsUpdate = true;
+				} );
+				textureLoader.load("texturas/terreno/sand_nor.jpg", function(pisoNormalMap){
+					pisoNormalMap.wrapS = THREE.RepeatWrapping;
+					pisoNormalMap.wrapT = THREE.RepeatWrapping;
+					pisoNormalMap.anisotropy = 16;
+					pisoNormalMap.repeat.set( 4, 4 );
+					pisoMallaMaterial.normalMap = pisoNormalMap;
+					pisoMallaMaterial.needsUpdate = true;
+				} );
+
+				//Agua
+				var aguaGeometry = new THREE.PlaneBufferGeometry( 40, 40 );
+				var flowMap = textureLoader.load( 'texturas/water/Water_1_M_Flow.jpg');
+
+				agua = new Water( aguaGeometry, {
+					scale: 2,
+					textureWidth: 1024,
+					textureHeight: 1024,
+					flowMap: flowMap
+				} );
+
+				agua.position.y = 0.5;
+				agua.rotation.x = Math.PI * - 0.5;
+				scene.add( agua );
+
+
+				//luz ambiental(todo el escenario)
+				//ambientLight = new THREE.AmbientLight(0xFFFFFF, 0.5);
+				//scene.add(ambientLight);
+
+				var hemisLight = new THREE.HemisphereLight( 0xFFFFFF, 0x080820, 0.65 );
+				scene.add( hemisLight );
+
+				//punto de luz
+				light = new THREE.PointLight(0xFFFFFF, 1.8, 28);
+				light.position.set(-10,18,15);
+				light.castShadow = true;
+				light.shadow.camera.near = 0.1;
+				light.shadow.camera.far = 60;
+				scene.add(light);
+
+				//Carga de assets
+				for( var _key in modelos ){
+					(function(key){
+						//MTL
+						var mtlLoader = new MTLLoader(loadingManager);
+						mtlLoader.load(modelos[key].mtl, function(materials){
+						materials.preload();
+						/*//TGA
+						var tgaLoader = new THREE.TGALoader(loadingManager);
+						tgaLoader.load(modelos[key].tga, function(materials){
+						materials.preload();*/
+
+							//OBJ
+							var objLoader = new OBJLoader(loadingManager);
+							objLoader.setMaterials(materials);
+							objLoader.load(modelos[key].obj, function(mesh){
+
+								mesh.traverse(function(node){
+									if( node instanceof THREE.Mesh ){
+										if('castShadow' in modelos[key])
+											node.castShadow = modelos[key].castShadow;
+										else {
+											node.castShadow = true;
+										}
+										if('receiveShadow' in modelos[key])
+											node.receiveShadow = modelos[key].receiveShadow;
+										else {
+											node.receiveShadow = true;
+										}
+									}
+								});
+								modelos[key].mesh = mesh;
+
+							});
+						});
+
+					})(_key);
+				}
+
+				// renderer
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setClearColor( 'lightblue', 1 );
+				renderer.shadowMap.enabled = true;
+				renderer.shadowMap.type = THREE.BasicShadowMap;
+
+				document.body.appendChild( renderer.domElement );
+
+				/*
+
+				var gui = new GUI();
+				gui.add( helper, 'visible' ).name( 'Show Flow Map' );
+				gui.open();
+
+				//var controls = new OrbitControls( camera, renderer.domElement );
+				*/
+
+
+
+				//
+
+				window.addEventListener( 'resize', onResize, false );
+
+			}
+
+			function onResourcesLoaded(){
+
+			  //zona media baja
+			  mallas["medioBloque"] = modelos.medioBloque.mesh.clone();
+			  mallas["medioBloque"].position.set(5, 0, 3.7);
+				mallas["medioBloque"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["medioBloque"]);
+				mallas["llave"] = modelos.llave.mesh.clone();
+			  mallas["llave"].position.set(5.2, 0.75, 3.7);
+				mallas["llave"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["llave"]);
+				mallas["medioPuente"] = modelos.medioPuente.mesh.clone();
+			  mallas["medioPuente"].position.set(6.3, -0.65, 2.5);
+				mallas["medioPuente"].rotation.y = -Math.PI/2;
+				mallas["medioPuente"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["medioPuente"]);
+			  mallas["medioBloque2"] = modelos.medioBloque.mesh.clone();
+			  mallas["medioBloque2"].position.set(5, 0, 5);
+				mallas["medioBloque2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["medioBloque2"]);
+				mallas["flores"] = modelos.flores.mesh.clone();
+			  mallas["flores"].position.set(5.4, 0.65, 5);
+				mallas["flores"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["flores"]);
+			  //segunda fila
+			  mallas["medioBloque3"] = modelos.medioBloque.mesh.clone();
+			  mallas["medioBloque3"].position.set(3.7, 0, 3.7);
+				mallas["medioBloque3"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["medioBloque3"]);
+				mallas["sierra"] = modelos.sierra.mesh.clone();
+			  mallas["sierra"].position.set(4.6, 0.65, 3.2);
+				mallas["sierra"].rotation.y = -Math.PI/2;
+				mallas["sierra"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["sierra"]);
+			  mallas["medioBloque4"] = modelos.medioBloque.mesh.clone();
+			  mallas["medioBloque4"].position.set(3.7, 0, 5);
+				mallas["medioBloque4"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["medioBloque4"]);
+			  mallas["medioBloque5"] = modelos.medioBloque.mesh.clone();
+			  mallas["medioBloque5"].position.set(3.7, 0, 6.3);
+				mallas["medioBloque5"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["medioBloque5"]);
+			  mallas["Bloque"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque"].position.set(3.7, -0.45, 7.6);
+				mallas["Bloque"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque"]);
+				mallas["sanja"] = modelos.sanja.mesh.clone();
+			  mallas["sanja"].position.set(3.7, 0.85, 6.3);
+				mallas["sanja"].rotation.y = -Math.PI/2;
+				mallas["sanja"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["sanja"]);
+				mallas["caja"] = modelos.caja.mesh.clone();
+			  mallas["caja"].position.set(2.9, 0.85, 6.9);
+				mallas["caja"].rotation.y = -Math.PI/4;
+				mallas["caja"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["caja"]);
+			  //Tercera fila
+			  mallas["medioBloque6"] = modelos.medioBloque.mesh.clone();
+			  mallas["medioBloque6"].position.set(2.4, 0, 3.7);
+				mallas["medioBloque6"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["medioBloque6"]);
+				mallas["saliente"] = modelos.saliente.mesh.clone();
+			  mallas["saliente"].position.set(3.7, 0.65, 3.7);
+				mallas["saliente"].rotation.y = +Math.PI/2;
+				mallas["saliente"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["saliente"]);
+			  mallas["Bloque2"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque2"].position.set(2.4, -0.45, 5);
+			  mallas["Bloque2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque2"]);
+				mallas["rampaMadera"] = modelos.rampaMadera.mesh.clone();
+			  mallas["rampaMadera"].position.set(2.4, 0.85, 3.7);
+				mallas["rampaMadera"].rotation.y = -Math.PI/2;
+			  mallas["rampaMadera"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["rampaMadera"]);
+			  mallas["Bloque3"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque3"].position.set(2.4, -0.45, 6.3);
+			  mallas["Bloque3"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque3"]);
+			  mallas["arbol"] = modelos.arbol.mesh.clone();
+			  mallas["arbol"].position.set(2.2, 0.85, 5.95);
+			  mallas["arbol"].scale.set(1.3,1.3,1.3);
+			  mallas["arbol"].rotation.y = -Math.PI/6;
+				scene.add(mallas["arbol"]);
+			  mallas["Bloque4"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque4"].position.set(2.4, -0.45, 7.6);
+				mallas["Bloque4"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque4"]);
+				mallas["sanja2"] = modelos.sanja.mesh.clone();
+			  mallas["sanja2"].position.set(2.4, 0.85, 6.3);
+				mallas["sanja2"].rotation.y = -Math.PI/2;
+				mallas["sanja2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["sanja2"]);
+
+				//zona media
+				mallas["Bloque5"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque5"].position.set(1.1, 0.2, 5);
+			  mallas["Bloque5"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque5"]);
+				mallas["letrero"] = modelos.letrero.mesh.clone();
+			  mallas["letrero"].position.set(1.5, 1.5, 3.2);
+				mallas["letrero"].rotation.y = -Math.PI/2;
+				mallas["letrero"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["letrero"]);
+				mallas["Bloque6"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque6"].position.set(-0.2, 0, 5);
+			  mallas["Bloque6"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque6"]);
+				mallas["Bloque7"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque7"].position.set(-1.5, 0.2, 5);
+			  mallas["Bloque7"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque7"]);
+				mallas["puente"] = modelos.puente.mesh.clone();
+			  mallas["puente"].position.set(-1.5, 0.2, 6.3);
+			  mallas["puente"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["puente"]);
+				mallas["Bloque8"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque8"].position.set(-2.8, 0.85, 5);
+			  mallas["Bloque8"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque8"]);
+				mallas["flores2"] = modelos.flores.mesh.clone();
+			  mallas["flores2"].position.set(-3.2, 2.15, 5.4);
+			  mallas["flores2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["flores2"]);
+				//segunda fila
+				mallas["Bloque9"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque9"].position.set(-0.2, 0.2, 3.7);
+			  mallas["Bloque9"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque9"]);
+				mallas["flores3"] = modelos.flores.mesh.clone();
+			  mallas["flores3"].position.set(0.2, 1.45, 3.4);
+			  mallas["flores3"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["flores3"]);
+				mallas["puente2"] = modelos.puente.mesh.clone();
+			  mallas["puente2"].position.set(-0.2, 0.2, 2.4);
+			  mallas["puente2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["puente2"]);
+				mallas["Bloque10"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque10"].position.set(-1.5, 0.2, 3.7);
+			  mallas["Bloque10"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque10"]);
+				mallas["bloqueDesMedio"] = modelos.bloqueDesMedio.mesh.clone();
+			  mallas["bloqueDesMedio"].position.set(-1.5, 1.5, 2.4);
+				mallas["bloqueDesMedio"].rotation.y = -Math.PI/2;
+			  mallas["bloqueDesMedio"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueDesMedio"]);
+				mallas["Bloque11"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque11"].position.set(-2.8, 0.85, 3.7);
+			  mallas["Bloque11"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque11"]);
+				mallas["salienteEsquina"] = modelos.salienteEsquina.mesh.clone();
+			  mallas["salienteEsquina"].position.set(-1.5, 2.15, 3.7);
+				mallas["salienteEsquina"].rotation.y =+ Math.PI/2;
+			  mallas["salienteEsquina"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["salienteEsquina"]);
+
+				//zona izq media
+				//primera fila
+				mallas["Bloque15"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque15"].position.set(-0.2, 0.2, 8.9);
+			  mallas["Bloque15"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque15"]);
+				mallas["trampaEs"] = modelos.trampaEs.mesh.clone();
+			  mallas["trampaEs"].position.set(-0.2, 1.5, 8.9);
+			  mallas["trampaEs"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["trampaEs"]);
+				mallas["bloqueBordeEsq"] = modelos.bloqueBordeEsq.mesh.clone();
+			  mallas["bloqueBordeEsq"].position.set(-0.2, 1.5, 11.5);
+			  mallas["bloqueBordeEsq"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueBordeEsq"]);
+				mallas["sanjaCurva"] = modelos.sanjaCurva.mesh.clone();
+			  mallas["sanjaCurva"].position.set(-0.3, 2.8, 11.6);
+			  mallas["sanjaCurva"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["sanjaCurva"]);
+				mallas["bloqueBorde"] = modelos.bloqueBorde.mesh.clone();
+			  mallas["bloqueBorde"].position.set(1.1, 1.5, 12.8);
+				mallas["bloqueBorde"].rotation.y =+ Math.PI/2;
+			  mallas["bloqueBorde"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueBorde"]);
+				mallas["bloqueBordeEsq2"] = modelos.bloqueBordeEsq.mesh.clone();
+			  mallas["bloqueBordeEsq2"].position.set(-0.2, 1.5, 12.8);
+				mallas["bloqueBordeEsq2"].rotation.y =- Math.PI/2;
+			  mallas["bloqueBordeEsq2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueBordeEsq2"]);
+				mallas["sanjaCurva2"] = modelos.sanjaCurva.mesh.clone();
+			  mallas["sanjaCurva2"].position.set(-0.3, 2.8, 12.7);
+				mallas["sanjaCurva2"].rotation.y =- Math.PI/2;
+			  mallas["sanjaCurva2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["sanjaCurva2"]);
+				//segunda fila
+				mallas["Bloque12"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque12"].position.set(-1.5, 0.2, 7.6);
+			  mallas["Bloque12"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque12"]);
+				mallas["Bloque14"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque14"].position.set(-1.5, 0.2, 8.9);
+			  mallas["Bloque14"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque14"]);
+				mallas["letrero2"] = modelos.letrero2.mesh.clone();
+			  mallas["letrero2"].position.set(-2, 1.4, 8.4);
+			  mallas["letrero2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["letrero2"]);
+				mallas["bloqueTierra"] = modelos.bloqueTierra.mesh.clone();
+			  mallas["bloqueTierra"].position.set(-1.5, 0.2, 10.2);
+			  mallas["bloqueTierra"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueTierra"]);
+				mallas["bloqueDes"] = modelos.bloqueDes.mesh.clone();
+			  mallas["bloqueDes"].position.set(-1.5, 1.5, 10.2);
+			  mallas["bloqueDes"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueDes"]);
+				mallas["bloqueTierra3"] = modelos.bloqueTierra.mesh.clone();
+			  mallas["bloqueTierra3"].position.set(-1.5, 0.2, 11.5);
+			  mallas["bloqueTierra3"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueTierra3"]);
+				mallas["Bloque17"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque17"].position.set(-1.5, 1.5, 11.5);
+			  mallas["Bloque17"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque17"]);
+				mallas["Bloque18"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque18"].position.set(-1.5, 1.5, 12.8);
+			  mallas["Bloque18"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque18"]);
+				mallas["puerta"] = modelos.puerta.mesh.clone();
+			  mallas["puerta"].position.set(-1.5, 2.8, 11.9);
+				mallas["puerta"].rotation.y =- Math.PI/2;
+			  mallas["puerta"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["puerta"]);
+				mallas["bloqueBorde2"] = modelos.bloqueBorde.mesh.clone();
+			  mallas["bloqueBorde2"].position.set(-1.5, 1.5, 14.1);
+			  mallas["bloqueBorde2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueBorde2"]);
+				//tercera fila
+				mallas["Bloque13"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque13"].position.set(-2.8, 0.2, 7.6);
+			  mallas["Bloque13"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque13"]);
+				mallas["flores4"] = modelos.flores.mesh.clone();
+			  mallas["flores4"].position.set(-2.5, 1.5, 6);
+				mallas["flores4"].rotation.y =- Math.PI/2;
+			  mallas["flores4"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["flores4"]);
+				mallas["medioPuente2"] = modelos.medioPuente.mesh.clone();
+			  mallas["medioPuente2"].position.set(-2.8, 1.5, 7.6);
+			  mallas["medioPuente2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["medioPuente2"]);
+				mallas["bloqueTierra3"] = modelos.bloqueTierra.mesh.clone();
+			  mallas["bloqueTierra3"].position.set(-2.8, 0.2, 8.9);
+			  mallas["bloqueTierra3"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueTierra3"]);
+				mallas["Bloque19"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque19"].position.set(-2.8, 1.5, 8.9);
+			  mallas["Bloque19"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque19"]);
+				mallas["bloqueTierra4"] = modelos.bloqueTierra.mesh.clone();
+			  mallas["bloqueTierra4"].position.set(-2.8, 0.2, 10.2);
+			  mallas["bloqueTierra4"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueTierra4"]);
+				mallas["Bloque20"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque20"].position.set(-2.8, 1.3, 10.2);
+			  mallas["Bloque20"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque20"]);
+				mallas["bloqueTierra6"] = modelos.bloqueTierra.mesh.clone();
+			  mallas["bloqueTierra6"].position.set(-2.8, 0.2, 11.5);
+			  mallas["bloqueTierra6"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueTierra6"]);
+				mallas["Bloque22"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque22"].position.set(-2.8, 1.5, 11.5);
+			  mallas["Bloque22"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque22"]);
+				mallas["letrero3"] = modelos.letrero.mesh.clone();
+			  mallas["letrero3"].position.set(-3.3, 2.8, 11);
+			  mallas["letrero3"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["letrero3"]);
+				mallas["bloqueBorde3"] = modelos.bloqueBorde.mesh.clone();
+			  mallas["bloqueBorde3"].position.set(-2.8, 1.5, 11.5);
+				mallas["bloqueBorde3"].rotation.y =- Math.PI/2;
+			  mallas["bloqueBorde3"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueBorde3"]);
+				mallas["hongos"] = modelos.hongos.mesh.clone();
+			  mallas["hongos"].position.set(-2.8, 2.8, 12.8);
+			  mallas["hongos"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["hongos"]);
+				mallas["bloqueBordeEsq3"] = modelos.bloqueBordeEsq.mesh.clone();
+			  mallas["bloqueBordeEsq3"].position.set(-1.5, 1.5, 12.8);
+				mallas["bloqueBordeEsq3"].rotation.y =- Math.PI/2 * 2;
+			  mallas["bloqueBordeEsq3"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueBordeEsq3"]);
+
+				//zona izq abajo
+				mallas["bloqueHexa"] = modelos.bloqueHexa.mesh.clone();
+			  mallas["bloqueHexa"].position.set(1.8, 0.2, 10.5);
+			  mallas["bloqueHexa"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueHexa"]);
+				mallas["bloqueHexaBajo"] = modelos.bloqueHexaBajo.mesh.clone();
+			  mallas["bloqueHexaBajo"].position.set(2.6, 0.2, 11);
+			  mallas["bloqueHexaBajo"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueHexaBajo"]);
+
+				//zona izq arriba
+				//primera fila
+				mallas["bloqueTierra7"] = modelos.bloqueTierra.mesh.clone();
+			  mallas["bloqueTierra7"].position.set(-4.1, 0.4, 8.9);
+			  mallas["bloqueTierra7"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueTierra7"]);
+				mallas["Bloque23"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque23"].position.set(-4.1, 1.7, 8.9);
+			  mallas["Bloque23"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque23"]);
+				mallas["saliente2"] = modelos.saliente.mesh.clone();
+			  mallas["saliente2"].position.set(-4.1, 3, 7.6);
+				mallas["saliente2"].rotation.y =- Math.PI/2;
+			  mallas["saliente2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["saliente2"]);
+				//segunda fila
+				mallas["bloqueTierra8"] = modelos.bloqueTierra.mesh.clone();
+			  mallas["bloqueTierra8"].position.set(-5.4, 0.2, 8.9);
+			  mallas["bloqueTierra8"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueTierra8"]);
+				mallas["Bloque24"] = modelos.bloque.mesh.clone();
+			  mallas["Bloque24"].position.set(-5.4, 1.5, 8.9);
+			  mallas["Bloque24"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["Bloque24"]);
+				mallas["arbol2"] = modelos.arbol.mesh.clone();
+			  mallas["arbol2"].position.set(-5.4, 2.8, 8.9);
+			  mallas["arbol2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["arbol2"]);
+				mallas["bloqueTierra9"] = modelos.bloqueTierra.mesh.clone();
+			  mallas["bloqueTierra9"].position.set(-5.4, 0.2, 7.6);
+			  mallas["bloqueTierra9"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueTierra9"]);
+				mallas["bloqueLevel"] = modelos.bloqueLevel.mesh.clone();
+			  mallas["bloqueLevel"].position.set(-5.4, 1.5, 7.6);
+			  mallas["bloqueLevel"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueLevel"]);
+				mallas["barril"] = modelos.barril.mesh.clone();
+			  mallas["barril"].position.set(-5.6, 2.8, 8.2);
+			  mallas["barril"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["barril"]);
+
+				//zona derecha medio
+				//primera fila
+				mallas["medioBloqueTierra"] = modelos.medioBloqueTierra.mesh.clone();
+			  mallas["medioBloqueTierra"].position.set(1.1, 0.2, -0.2);
+			  mallas["medioBloqueTierra"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["medioBloqueTierra"]);
+				mallas["bloqueDesMedioNieve"] = modelos.bloqueDesMedioNieve.mesh.clone();
+			  mallas["bloqueDesMedioNieve"].position.set(1.1, 0.85, -1.5);
+				mallas["bloqueDesMedioNieve"].rotation.y =- Math.PI/2;
+			  mallas["bloqueDesMedioNieve"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueDesMedioNieve"]);
+				mallas["bloqueHexaBajoNieve"] = modelos.bloqueHexaBajoNieve.mesh.clone();
+			  mallas["bloqueHexaBajoNieve"].position.set(1.6, 0.2, 1.6);
+			  mallas["bloqueHexaBajoNieve"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueHexaBajoNieve"]);
+				//segunda fila
+				mallas["bloqueNieve"] = modelos.bloqueNieve.mesh.clone();
+			  mallas["bloqueNieve"].position.set(-0.2, 0.2, 1.1);
+			  mallas["bloqueNieve"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueNieve"]);
+				mallas["bloqueNieve2"] = modelos.bloqueNieve.mesh.clone();
+			  mallas["bloqueNieve2"].position.set(-0.2, 0.2, -0.2);
+			  mallas["bloqueNieve2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueNieve2"]);
+				mallas["bloqueDesNieve"] = modelos.bloqueDesNieve.mesh.clone();
+			  mallas["bloqueDesNieve"].position.set(-0.2, 0.2, -2.8);
+				mallas["bloqueDesNieve"].rotation.y =- Math.PI/2;
+			  mallas["bloqueDesNieve"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueDesNieve"]);
+				//tercer fila
+				mallas["bloqueNieve2"] = modelos.bloqueNieve.mesh.clone();
+			  mallas["bloqueNieve2"].position.set(-1.5, 0.2, 1.1);
+			  mallas["bloqueNieve2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueNieve2"]);
+				mallas["hongos2"] = modelos.hongos.mesh.clone();
+			  mallas["hongos2"].position.set(-1.2, 1.5, 0.4);
+			  mallas["hongos2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["hongos2"]);
+				mallas["bloqueNieve3"] = modelos.bloqueNieve.mesh.clone();
+			  mallas["bloqueNieve3"].position.set(-1.5, 0.2, -0.2);
+			  mallas["bloqueNieve3"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueNieve3"]);
+				mallas["arbolNieve"] = modelos.arbolNieve.mesh.clone();
+			  mallas["arbolNieve"].position.set(-1.5, 1.5, -0.2);
+			  mallas["arbolNieve"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["arbolNieve"]);
+				mallas["bloqueNieve4"] = modelos.bloqueNieve.mesh.clone();
+			  mallas["bloqueNieve4"].position.set(-1.5, 0.2,-1.5);
+			  mallas["bloqueNieve4"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueNieve4"]);
+				mallas["rocas2"] = modelos.rocas.mesh.clone();
+			  mallas["rocas2"].position.set(-1.5, 1.5,-1);
+			  mallas["rocas2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["rocas2"]);
+				mallas["aviso"] = modelos.aviso.mesh.clone();
+			  mallas["aviso"].position.set(-1.9, 1.5,-1.8);
+			  mallas["aviso"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["aviso"]);
+				mallas["medioPuente3"] = modelos.medioPuente.mesh.clone();
+			  mallas["medioPuente3"].position.set(-1.5, 0.2,-2.8);
+			  mallas["medioPuente3"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["medioPuente3"]);
+				mallas["trampa"] = modelos.trampa.mesh.clone();
+			  mallas["trampa"].position.set(-1.85, 0.2,-3.7);
+			  mallas["trampa"].scale.set(2,2,2);
+				scene.add(mallas["trampa"]);
+				//cuarta fila
+				mallas["bloqueTierra10"] = modelos.bloqueTierra.mesh.clone();
+			  mallas["bloqueTierra10"].position.set(-2.8, 0.2, 1.1);
+			  mallas["bloqueTierra10"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueTierra10"]);
+				mallas["bloqueDesNieve2"] = modelos.bloqueDesNieve.mesh.clone();
+			  mallas["bloqueDesNieve2"].position.set(-2.8, 1.5, -0.2);
+				mallas["bloqueDesNieve2"].rotation.y =- Math.PI/2;
+			  mallas["bloqueDesNieve2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueDesNieve2"]);
+				//quinta fila
+				mallas["bloqueTierra11"] = modelos.bloqueTierra.mesh.clone();
+			  mallas["bloqueTierra11"].position.set(-4.1, 0.2, 1.1);
+			  mallas["bloqueTierra11"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueTierra11"]);
+				mallas["rocas"] = modelos.rocas.mesh.clone();
+			  mallas["rocas"].position.set(-2.95, 2.8, 1.3);
+				mallas["rocas"].rotation.y =+ Math.PI/2;
+			  mallas["rocas"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["rocas"]);
+				mallas["bloqueNieve5"] = modelos.bloqueNieve.mesh.clone();
+			  mallas["bloqueNieve5"].position.set(-4.1, 1.5, 1.1);
+			  mallas["bloqueNieve5"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueNieve5"]);
+				mallas["bloqueEsPeque"] = modelos.bloqueEsPeque.mesh.clone();
+			  mallas["bloqueEsPeque"].position.set(-4.1, 1.5, -0.2);
+			  mallas["bloqueEsPeque"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueEsPeque"]);
+				mallas["bloqueEsPeque2"] = modelos.bloqueEsPeque.mesh.clone();
+			  mallas["bloqueEsPeque2"].position.set(-4.1, 0.2, -0.2);
+			  mallas["bloqueEsPeque2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueEsPeque2"]);
+				mallas["bloqueHexaBajoNieve2"] = modelos.bloqueHexaBajoNieve.mesh.clone();
+			  mallas["bloqueHexaBajoNieve2"].position.set(-5, 0.2, -1.2);
+			  mallas["bloqueHexaBajoNieve2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueHexaBajoNieve2"]);
+				//sexta fila
+				mallas["bloqueNieve7"] = modelos.bloqueNieve.mesh.clone();
+			  mallas["bloqueNieve7"].position.set(-5.4, 2.15, 2.4);
+			  mallas["bloqueNieve7"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueNieve7"]);
+				mallas["bloqueTierra12"] = modelos.bloqueTierra.mesh.clone();
+			  mallas["bloqueTierra12"].position.set(-5.4, 0.2, 1.1);
+			  mallas["bloqueTierra12"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueTierra12"]);
+				mallas["bloqueTierra13"] = modelos.bloqueTierra.mesh.clone();
+			  mallas["bloqueTierra13"].position.set(-5.4, 1.5, 1.1);
+			  mallas["bloqueTierra13"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueTierra13"]);
+				mallas["bloqueDesMedioNieve2"] = modelos.bloqueDesMedioNieve.mesh.clone();
+			  mallas["bloqueDesMedioNieve2"].position.set(-5.4, 2.8, 1.1);
+			  mallas["bloqueDesMedioNieve2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueDesMedioNieve2"]);
+				mallas["bloqueTierra14"] = modelos.bloqueTierra.mesh.clone();
+			  mallas["bloqueTierra14"].position.set(-5.4, 0.2, -0.2);
+			  mallas["bloqueTierra14"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueTierra14"]);
+				mallas["sanjaMedia"] = modelos.sanjaMedia.mesh.clone();
+			  mallas["sanjaMedia"].position.set(-4.1, 2.8, -0.2);
+				mallas["sanjaMedia"].rotation.y =+ Math.PI/2;
+			  mallas["sanjaMedia"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["sanjaMedia"]);
+				mallas["bloqueNieve6"] = modelos.bloqueNieve.mesh.clone();
+			  mallas["bloqueNieve6"].position.set(-5.4, 1.5, -0.2);
+			  mallas["bloqueNieve6"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueNieve6"]);
+				mallas["bloqueHexaNieve"] = modelos.bloqueHexaNieve.mesh.clone();
+			  mallas["bloqueHexaNieve"].position.set(-6, 0.2, -0.8);
+			  mallas["bloqueHexaNieve"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueHexaNieve"]);
+				mallas["bloqueHexaBajoNieve3"] = modelos.bloqueHexaBajoNieve.mesh.clone();
+			  mallas["bloqueHexaBajoNieve3"].position.set(-6, 0.2, -3);
+			  mallas["bloqueHexaBajoNieve3"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueHexaBajoNieve3"]);
+				//septima fila
+				mallas["plataforma"] = modelos.plataforma.mesh.clone();
+			  mallas["plataforma"].position.set(-6.7, 5.1, 5.9);
+			  mallas["plataforma"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["plataforma"]);
+				mallas["bandera"] = modelos.bandera.mesh.clone();
+			  mallas["bandera"].position.set(-6.7, 5.4, 5.9);
+			  mallas["bandera"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bandera"]);
+				mallas["plataforma2"] = modelos.plataforma.mesh.clone();
+			  mallas["plataforma2"].position.set(-6.7, 3.1, 3.7);
+			  mallas["plataforma2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["plataforma2"]);
+				mallas["bloqueNieve8"] = modelos.bloqueNieve.mesh.clone();
+			  mallas["bloqueNieve8"].position.set(-6.7, 2.15, 2.4);
+			  mallas["bloqueNieve8"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueNieve8"]);
+				mallas["bloqueNieve9"] = modelos.bloqueNieve.mesh.clone();
+			  mallas["bloqueNieve9"].position.set(-6.7, 2.15, 1.1);
+			  mallas["bloqueNieve9"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["bloqueNieve9"]);
+				mallas["arbolNieve2"] = modelos.arbolNieve.mesh.clone();
+			  mallas["arbolNieve2"].position.set(-6.7, 3.45, 1.1);
+			  mallas["arbolNieve2"].scale.set(1.3,1.3,1.3);
+				scene.add(mallas["arbolNieve2"]);
+
+
+
+
+
+			}
+
+			function onResize() {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+
+			function animate() {
+
+				if( RESOURCES_LOADED == false ){
+					requestAnimationFrame(animate);
+
+					loadingScreen.box.position.x -= 0.05;
+					if( loadingScreen.box.position.x < -10 ) loadingScreen.box.position.x = 10;
+					loadingScreen.box.position.y = Math.sin(loadingScreen.box.position.x);
+
+					renderer.render(loadingScreen.scene, loadingScreen.camera);
+					return;
+				}
+
+				requestAnimationFrame( animate );
+				render();
+
+				//var time = Date.now() * 0.0005;
+
+
+				if(keyboard[87]){ // W
+			    camera.position.x -= Math.sin(camera.rotation.y) * jugador.speed;
+			    camera.position.z -= -Math.cos(camera.rotation.y) * jugador.speed;
+			  }
+			  if(keyboard[83]){ // S
+			    camera.position.x += Math.sin(camera.rotation.y) * jugador.speed;
+			    camera.position.z += -Math.cos(camera.rotation.y) * jugador.speed;
+			  }
+			  if(keyboard[65]){ // A
+			    camera.position.x += Math.sin(camera.rotation.y + Math.PI/2) * jugador.speed;
+			    camera.position.z += -Math.cos(camera.rotation.y + Math.PI/2) * jugador.speed;
+			  }
+			  if(keyboard[68]){ // D
+			    camera.position.x += Math.sin(camera.rotation.y - Math.PI/2) * jugador.speed;
+			    camera.position.z += -Math.cos(camera.rotation.y - Math.PI/2) * jugador.speed;
+			  }
+
+			  if(keyboard[37]){ // Flecha izq
+			    camera.rotation.y -= jugador.turnSpeed;
+			  }
+			  if(keyboard[38]){ // Flecha arriba
+			    camera.position.y += jugador.turnSpeed;
+			  }
+			  if(keyboard[39]){ // Flecha der
+			    camera.rotation.y += jugador.turnSpeed;
+			  }
+			  if(keyboard[40]){ // Flecha abajo
+			    camera.position.y -= jugador.turnSpeed;
+			  }
+
+			}
+
+			//tecla presionada
+			function keyDown(event){
+				keyboard[event.keyCode] = true;
+			}
+			//tecla liberada
+			function keyUp(event){
+				keyboard[event.keyCode] = false;
+			}
+
+			window.addEventListener('keydown', keyDown);
+			window.addEventListener('keyup', keyUp);
+
+			//logica
+			function render() {
+
+				var delta = clock.getDelta();
+				step += 0.008;
+
+				//rotacion de la sierra
+				mallas["sierra"].rotateX(Math.PI/10);
+				mallas["llave"].position.y = 0.7 +(0.4	*Math.abs(Math.sin(step)));
+
+				//movimiento plataforma
+				mallas["plataforma"].position.y = 5.1 -(1.18	*Math.abs(Math.sin(step)));
+
+				//movimiento bandera
+				mallas["bandera"].position.y = 5.4 -(1.18	*Math.abs(Math.sin(step)));
+
+				//movimiento plataforma2
+				mallas["plataforma2"].position.y = 3.12 +(0.8	*Math.abs(Math.sin(step)));
+				mallas["plataforma2"].position.z = 3.7 +(0.9	*Math.abs(Math.sin(step)));
+
+				renderer.render( scene, camera );
+
+			}
+
+		</script>
+
+</body>
+</html>
